@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/upload.css') }}">
+    <title>Crop your Photos</title>
+</head>
+<body>
+    <header>
+        <a href="/">
+            <h1 id="ProfilePictures">Profile Pictures</h1>
+        </a>
+    </header>
+    <div class="reorder-container" id="reorderContainer">
+        <div class="main-content">
+            <h2>Check your Photos</h2>
+            <div>
+                <label for="dimensions">Choose Dimensions (Pixels):</label>
+                <select id="dimensions" name="dimensions">
+                    <option value="768x768">768 x 768 (Standard)</option>
+                    <option value="1200x1200">1200 x 1200</option>
+                </select>
+            </div>
+            <div class="file-preview" id="filePreview">
+                {% if files|length > 50 %}
+                    <div>
+                        <img src="{{ url_for('static', filename='image/folder_icon.png') }}" alt="Folder Icon">
+                        <p>Folder</p>
+                    </div>
+                {% else %}
+                    {% for file in files %}
+                        <div>
+                            <img src="{{ url_for('serve_image', filename=file) }}" alt="{{ file }}">
+                            <p>{{ file }}</p>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            </div>
+        </div>
+        <button class="Submit-Button" onclick="uploadReorderedFiles()">Submit your photos</button>
+        <button class="add-button" onclick="document.getElementById('fileInput').click()">+</button>
+        <input type="file" id="fileInput" class="hidden" multiple>
+    </div>
+    <div class="progress-container" id="progressContainer" style="display: none;">
+        <h2 class="">Processing...</h2>
+        <div class="progress-bar-background" id = 'progressbarbackground'>
+            <div class="progress-bar-fill" id="progressBarFill"></div> 
+        </div>
+        <h3 class="progress-message" id = 'progressMessage'></h3>
+    </div>
+    <h2 class="download-saying" id="downloadsay" style="display: none;">Finished Croping!</h2>
+    <button class="download-button" id="downloadButton" style="display: none;" onclick="downloadphotos()">Download Croped Photos</button>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.14.0/Sortable.min.js"></script>
+    <script>
+        const reorderContainer = document.getElementById('reorderContainer');
+        const fileInput = document.getElementById('fileInput');
+        const progressContainer = document.getElementById('progressContainer');
+        const progressBarFill = document.getElementById('progressBarFill');
+        const progressMessage = document.getElementById('progressMessage');
+        const downloadsay = document.getElementById('downloadsay')
+
+        new Sortable(filePreview, {
+            animation: 150,
+            onEnd: function () {
+                console.log('Files submited');
+            }
+        });
+
+        function uploadReorderedFiles() {
+            const reorderedFiles = [];
+            filePreview.childNodes.forEach(node => {
+                if (node.nodeName.toLowerCase() === 'div') {
+                    reorderedFiles.push(node.querySelector('p').innerText);
+                }
+            });
+
+            const dimensionsSelect = document.getElementById('dimensions');
+            const selectedDimensions = dimensionsSelect.value;
+
+            fetch('/submit', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ 
+                    files: reorderedFiles,
+                    dimensions: selectedDimensions
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log(data);
+                showProgressBar();
+                checkProgress();
+            })
+            .catch(error => {
+                console.error(error);
+                alert('Error submitting');
+            });
+        }
+
+        function showProgressBar() {
+            reorderContainer.style.display = 'none';
+            progressContainer.style.display = 'block';
+            
+        }
+
+        function checkProgress() {
+            fetch('/progress', {method:'GET'})
+                .then(response => response.json())
+                .then(data => {
+                    progressMessage.innerHTML = JSON.stringify(data.message)
+                    progressMessage.style.fontSize = '1rem';
+                    progressBarFill.style.width = data.progress + '%';
+                    if (data.progress < 100) {
+                        setTimeout(checkProgress, 500);
+                    } else {
+                        progressContainer.style.display = 'none';
+                        downloadButton.style.display = 'block';
+                        downloadsay.style.display = 'block';
+                    }
+                })
+                .catch(error => {
+                    console.error(error);
+                });
+        }
+
+        reorderContainer.addEventListener('dragover', (event) => {
+            event.preventDefault();
+            reorderContainer.classList.add('dragover');
+        });
+
+        reorderContainer.addEventListener('dragleave', () => {
+            reorderContainer.classList.remove('dragover');
+        });
+
+        reorderContainer.addEventListener('drop', (event) => {
+            event.preventDefault();
+            reorderContainer.classList.remove('dragover');
+            handleFiles(event.dataTransfer.files);
+        });
+
+        fileInput.addEventListener('change', (event) => {
+            handleFiles(event.target.files);
+        });
+
+        function handleFiles(files) {
+            const formData = new FormData();
+            for (const file of files) {
+                formData.append('files', file);
+            }
+
+            fetch('/upload', {
+                method: 'POST',
+                body: formData,
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log(data);
+                alert('Files uploaded successfully');
+                window.location.href = '/reorder';
+            })
+            .catch(error => {
+                console.error(error);
+                alert('Error uploading files');
+            });
+        }
+    
+        function downloadphotos() {
+            fetch('/download', {
+                method: 'POST'
+            })
+            .then(response => response.blob())
+            .then(blob => {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = '{{ filename }}.zip';
+                a.click();
+                window.URL.revokeObjectURL(url);
+                window.location.href = '/'
+            })
+            .catch(error => {
+                console.error(error);
+                alert('Error downloading');
+            });
+        }
+    </script>
+</body>
+</html>

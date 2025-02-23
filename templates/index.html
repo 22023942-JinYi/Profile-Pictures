@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="{{ url_for('static', filename= 'css/style.css') }}">
+    <title>Crop your Photos</title>
+</head>
+<body>
+    <header>
+        <a href="/">
+            <h1 id="ProfilePictures">Profile Pictures</h1>
+        </a>
+    </header>
+    <div class="tool_droparea" id="uploadArea">
+        <div class="main-content">
+            <h2>Crop your Photos</h2>
+            <p>Have your photos cropped automatically!</p>
+            <input type="file" id="fileInput" class="hidden" multiple>
+            <button onclick="document.getElementById('fileInput').click()">Select Your Photos</button>
+            <p>or drop your photos here</p>
+        </div>
+    </div>
+    <script>
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+
+        uploadArea.addEventListener('dragover', (event) => {
+            event.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (event) => {
+            event.preventDefault();
+            uploadArea.classList.remove('dragover');
+            handleFiles(event.dataTransfer.files);
+        });
+
+        fileInput.addEventListener('change', (event) => {
+            handleFiles(event.target.files);
+        });
+
+        function handleFiles(files) {
+            const formData = new FormData();
+            for (const file of files) {
+                formData.append('files', file);
+            }
+
+            fetch('/upload', {
+                method: 'POST',
+                body: formData,
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log(data);
+                alert('Files uploaded successfully');
+                window.location.href = '/reorder';
+            })
+            .catch(error => {
+                console.error(error);
+                alert('Error uploading files');
+            });
+        }
+    </script>
+</body>
+</html>
